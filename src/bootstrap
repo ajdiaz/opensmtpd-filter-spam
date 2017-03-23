@@ -1,0 +1,34 @@
+#! /bin/bash
+# initial boostraping
+# usage: boostrap <commit> <user-smtpd> <user-smtpq>
+
+opensmtpd_extras="$1"; shift
+opensmtpd_extras_url="https://github.com/OpenSMTPD/opensmtpd-extras.git"
+
+if [[ ! -d "$opensmtpd_extras" ]] ||
+   [[ ! -x "$opensmtpd_extras/bootstrap" ]]; then
+  git clone "$opensmtpd_extras_url" "$opensmtpd_extras"
+  if [[ "$1" != "master" ]]; then
+    ( cd "$opensmtpd_extras" && git checkout "$1"; )
+  fi
+fi
+
+for patch in patch/*; do
+  ( cd "$opensmtpd_extras" && patch -p1 < "../$patch"; )
+done
+
+if [[ ! -x "$opensmtpd_extras/configure" ]]; then
+  ( cd "$opensmtpd_extras" && ./bootstrap; )
+fi
+
+if [[ ! -f "$opensmtpd_extras/config.h" ]]; then
+  ( cd "$opensmtpd_extras" && ./configure --with-gnu-ld \
+      --with-filter-stub --with-table-stub --with-scheduler-stub \
+      --with-queue-stub --with-user-smtpd="${2:-smtpd}" \
+      --with-user-queue="${3:-smtpq}"; )
+fi
+
+if [[ ! -f "$opensmtpd_extras/api/filter_api.o" ]]
+then
+  ( cd "$opensmtpd_extras" && make; )
+fi

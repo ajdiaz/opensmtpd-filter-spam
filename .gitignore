@@ -1,0 +1,5 @@
+src/filter-spam
+src/*.o
+*.swp
+*~
+src/opensmtpd-extras

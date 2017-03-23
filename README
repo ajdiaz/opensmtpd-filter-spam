@@ -1,0 +1,21 @@
+OpenSMTPD spam trap support
+===========================
+
+**Still under active development**
+
+
+This extra filter allow you to create a spam tram in OpenSMTPD, using DNSBL,
+greylisting and SPF check all-in-one.
+
+Requires:
+  libspf2
+  libdb
+
+Compile:
+  make
+
+Install:
+  cp filter-spam to the proper library dir of opensmtpd
+
+Run:
+  As any other filter.
