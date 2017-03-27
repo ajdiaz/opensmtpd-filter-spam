@@ -28,8 +28,16 @@ typedef enum spamstate {
     SPAM_GOOD = 0x2,
 } spamstate_t;
 
+typedef struct {
+  sa_family_t sa_family;
+  char *addr;
+  char *helo;
+} spam_session_t;
 
 char *
 helper_ip2str(const struct sockaddr_storage *ss);
+
+spam_session_t *
+spam_get_session(uint64_t id);
 
 #endif /* !FILTER_SPAM_H */

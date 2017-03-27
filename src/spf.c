@@ -26,85 +26,16 @@
 #include "filter_spam.h"
 #include "spf.h"
 
-#ifdef ENABLE_SESSION
-#define GETUDATA(i) filter_api_session(i)
-spam_spf_t *
-spf_session_alloc(uint64_t id)
-{
-  log_debug("filter-spam: spf: spf_allocator");
-  return xcalloc(1, sizeof(spam_spf_t), "filter-spam: spf_alloc");
-}
-
-void
-spf_session_destructor(void *s)
-{
-  log_debug("filter-spam: spf: spf_destructor");
-  spf_clear((spam_spf_t *)s);
-}
-#else
-#define GETUDATA(i) filter_api_get_udata(i)
-#endif
-
-
-static spam_spf_t *
-spf_session_set_conn(uint64_t id, const struct sockaddr_storage *ss)
-{
-  spam_spf_t *ret;
-  char *buf;
-
-#ifdef ENABLE_SESSION
-  ret = (spam_spf_t *) GETUDATA(id);
-#else
-  ret = xcalloc(1, sizeof(spam_spf_t), "filter-spam: spf_alloc");
-#endif
-
-  log_debug("filter-spam: spf: set_conn: %p", ret);
-  ret->sa_family = ss->ss_family;
-
-  if ((buf = helper_ip2str(ss)) == NULL)
-    return NULL;
-
-  /* now we have a string representation of the IP */
-  ret->addr = buf;
-
-#ifndef ENABLE_SESSION
-  filter_api_set_udata(id, ret);
-#endif
-
-  return ret;
-}
-
-
-static void
-spf_clear(spam_spf_t *d)
-{
-  if (d != NULL) { /* prevent double free */
-    if (d->addr) free(d->addr);
-    if (d->helo) free(d->helo);
-    free(d);
-  }
-}
-
-spamstate_t
-spam_step_spf_connect(uint64_t id, struct filter_connect *conn)
-{
-  log_debug("filter-spam: spf: on connect %lu", id);
-  if ((spf_session_set_conn(id, &conn->remote)) == NULL)
-    log_warn("filter-spam: spf: unable to set conn in session");
-
-  return SPAM_NEUTRAL;
-}
-
 
 spamstate_t
 spam_step_spf_helo(uint64_t id, const char *helo)
 {
-  spam_spf_t *d;
+  spam_session_t *d;
   log_debug("filter-spam: spf: on helo %lu", id);
 
-  if ((d = GETUDATA(id)) == NULL)
+  if ((d = spam_get_session(id)) == NULL)
     /* in theory never happen */
-    fatalx("filter-spam: spf: no spam_spf_t initialized on HELO");
+    fatalx("filter-spam: spf: no spam_session_t initialized on HELO");
 
   if(d->helo) free(d->helo);
   d->helo = strdup(helo);
@@ -115,7 +46,7 @@ spam_step_spf_helo(uint64_t id, const char *helo)
 spamstate_t
 spam_step_spf_mail(uint64_t id, struct mailaddr *mail)
 {
-  spam_spf_t *d;
+  spam_session_t *d;
   char *err = NULL;
   spamstate_t ret = SPAM_NEUTRAL;
   SPF_server_t *spf_server = NULL;
@@ -125,9 +56,9 @@ spam_step_spf_mail(uint64_t id, struct mailaddr *mail)
 
   log_debug("filter-spam: spf: on mail");
 
-  if ((d = GETUDATA(id)) == NULL)
+  if ((d = spam_get_session(id)) == NULL)
     /* in theory never happen */
-    fatalx("filter-spam: spf: no spam_spf_t initialized on MAIL");
+    fatalx("filter-spam: spf: no spam_session_t initialized on MAIL");
 
 #define GOTO_CLEAN(_x) { err=_x; goto clean; }
 
@@ -188,8 +119,5 @@ clean:
   if (err) log_warn("%s", err);
   if (spf_server) free(spf_server);
   if (spf_request) free(spf_request);
-#ifndef ENABLE_SESSION
-  spf_clear(d);
-#endif
   return ret;
 }

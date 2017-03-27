@@ -53,7 +53,7 @@ grey_setconf_fastrecon(time_t f)
 }
 
 spamstate_t
-spam_step_grey(uint64_t id, struct filter_connect *conn)
+spam_step_grey_mail(uint64_t id, struct mailaddr *addr)
 {
   char *buf = NULL;
   int ret;
@@ -61,22 +61,28 @@ spam_step_grey(uint64_t id, struct filter_connect *conn)
   DBT key, data;
   time_t t;
   spamstate_t chain = SPAM_GOOD;
-
+  spam_session_t *d;
 
   log_debug("filter-spam: grey: on_connect");
 
-  if ((buf = helper_ip2str(&conn->remote)) == NULL)
-    return SPAM_GOOD; /* do not stop chain for this */
+  if ((d = spam_get_session(id)) == NULL)
+    /* in theory never happen */
+    fatalx("filter-spam: grey: no spam_session_t initialized on MAIL");
+
+  buf = d->addr;
 
   if ((ret = db_create(&dbp, NULL, 0)) != 0)
-    abort(err, "filter-spam: grey: unable to create DB object");
+  {
+    log_warn("filter-spam: grey: unable to create DB object");
+    return chain;
+  }
 
 	if ((ret = dbp->open(dbp, NULL, greylist_db, NULL, DB_BTREE,
 	                     DB_CREATE, 0664)) != 0)
 	{
 	  log_warn("filter-spam: grey: unable to open greylist DB: %s",
 		      greylist_db);
-		goto err;
+		return chain;
   }
 
   t = time(&t);
@@ -124,7 +130,5 @@ spam_step_grey(uint64_t id, struct filter_connect *conn)
     log_warn("filter-spam: grey: unable to save time into greylist DB");
 
   (void) dbp->close(dbp, 0);
-
-err: free(buf);
-     return chain; /* do not stop chain for this */
+  return chain;
 }

@@ -23,25 +23,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-
-typedef struct {
-  sa_family_t sa_family;
-  char *addr;
-  char *helo;
-} spam_spf_t;
-
-
-#ifdef ENABLE_SESSION
-spam_spf_t *
-spf_session_alloc(uint64_t id);
-
-void
-spf_session_destructor(void *s);
-#endif
-
-spamstate_t
-spam_step_spf_connect(uint64_t id, struct filter_connect *conn);
-
 void
 spam_step_spf_exit(uint64_t id);
 

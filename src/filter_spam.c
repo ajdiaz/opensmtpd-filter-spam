@@ -24,6 +24,93 @@
 #include "spf.h"
 #include "grey.h"
 
+#ifdef ENABLE_SESSION
+#define GETUDATA(i) filter_api_session(i)
+spam_session_t *
+spam_session_alloc(uint64_t id)
+{
+  log_debug("filter-spam: session_allocator");
+  return xcalloc(1, sizeof(spam_session_t), "filter-spam: session_alloc");
+}
+
+void
+spam_session_destructor(void *s)
+{
+  log_debug("filter-spam: session_destructor");
+  spam_clear((spam_session_t *)s);
+}
+#else
+#define GETUDATA(i) filter_api_get_udata(i)
+#endif
+
+
+static spam_session_t *
+spam_session_set_conn(uint64_t id, const struct sockaddr_storage *ss)
+{
+  spam_session_t *ret;
+  char *buf;
+
+#ifdef ENABLE_SESSION
+  ret = (spam_session_t *) GETUDATA(id);
+#else
+  ret = xcalloc(1, sizeof(spam_session_t), "filter-spam: session_alloc");
+#endif
+
+  log_debug("filter-spam: set_conn: %p", ret);
+  ret->sa_family = ss->ss_family;
+
+  if ((buf = helper_ip2str(ss)) == NULL)
+    return NULL;
+
+  /* now we have a string representation of the IP */
+  ret->addr = buf;
+
+#ifndef ENABLE_SESSION
+  filter_api_set_udata(id, ret);
+#endif
+
+  return ret;
+}
+
+spam_session_t *
+spam_get_session(uint64_t id)
+{
+  spam_session_t *s = NULL;
+  s = GETUDATA(id);
+  return s;
+}
+
+static void
+spam_clear(spam_session_t *d)
+{
+  if (d != NULL) { /* prevent double free */
+    if (d->addr) free(d->addr);
+    if (d->helo) free(d->helo);
+    free(d);
+  }
+}
+
+spamstate_t
+spam_step_all_connect(uint64_t id, struct filter_connect *conn)
+{
+  log_debug("filter-spam: on connect %lu", id);
+  if ((spam_session_set_conn(id, &conn->remote)) == NULL)
+    log_warn("filter-spam: unable to set conn in session");
+
+  return SPAM_NEUTRAL;
+}
+
+void
+spam_step_all_disconnect(uint64_t id)
+{
+  spam_session_t *d = NULL;
+
+  if ((d = GETUDATA(id)) == NULL)
+    /* in theory never happen */
+    fatalx("filter-spam: no spam_session_t initialized on disconnect");
+
+  spam_clear(d);
+}
 
 char *
 helper_ip2str(const struct sockaddr_storage *ss)
@@ -84,13 +171,13 @@ helper_ip2str(const struct sockaddr_storage *ss)
 static void *
 on_session_alloc(uint64_t id)
 {
-  return (void *)spf_session_alloc(id);
+  return (void *)spam_session_alloc(id);
 }
 
 void
 on_session_destructor(void *s)
 {
-  spf_session_destructor(s);
+  spam_session_destructor(s);
 }
 #endif
 
@@ -120,12 +207,17 @@ on_mail(uint64_t id, struct mailaddr *m)
     case SPAM_BAD:
       return filter_api_reject_code(id, FILTER_CLOSE, 550,
                                     "Blacklisted");
-    case SPAM_NEUTRAL:
     case SPAM_GOOD:
+      log_debug("Bypassing greylist because good SPF");
       return filter_api_accept(id);
+
+    case SPAM_NEUTRAL:
+      if (spam_step_grey_mail(id, m) == SPAM_NEUTRAL)
+        return filter_api_reject_code(id, FILTER_CLOSE, 451,
+                                      "Temporary error");
   }
 
-  return 1;
+  return filter_api_accept(id);
 }
 
 static int
@@ -133,20 +225,22 @@ on_connect(uint64_t id, struct filter_connect *conn)
 {
   log_debug("debug: on_connect");
 
+  (void) spam_step_all_connect(id, conn);
   (void) spam_step_pause(id, conn);
 
-  if ((spam_step_dnsbl(id, conn) == SPAM_BAD) ||
-      (spam_step_spf_connect(id, conn) == SPAM_BAD))
+  if (spam_step_dnsbl(id, conn) == SPAM_BAD)
     return filter_api_reject_code(id, FILTER_CLOSE, 550,
                                   "Blacklisted");
-
-  if (spam_step_grey(id, conn) == SPAM_NEUTRAL)
-    return filter_api_reject_code(id, FILTER_CLOSE, 451,
-                                  "Temporary error");
 
   return filter_api_accept(id);
 }
 
+static void
+on_disconnect(uint64_t id)
+{
+  log_debug("filter-spam: on_disconnect");
+  (void) spam_step_all_disconnect(id);
+}
 
 int
 main(int argc, char **argv)
@@ -209,6 +303,7 @@ main(int argc, char **argv)
   filter_api_on_connect(on_connect);
   filter_api_on_helo(on_helo);
   filter_api_on_mail(on_mail);
+  filter_api_on_disconnect(on_disconnect);
   filter_api_no_chroot();
   filter_api_loop();
 
