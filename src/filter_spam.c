@@ -95,7 +95,7 @@ spam_step_all_connect(uint64_t id, struct filter_connect *conn)
 {
   log_debug("filter-spam: on connect %lu", id);
   if ((spam_session_set_conn(id, &conn->remote)) == NULL)
-    log_warn("filter-spam: unable to set conn in session");
+    log_warnx("filter-spam: unable to set conn in session");
 
   return SPAM_NEUTRAL;
 }
@@ -133,7 +133,7 @@ helper_ip2str(const struct sockaddr_storage *ss)
 
     if (hinet6_str(ip6, buf) == NULL)
     {
-      log_warn("filter-spam: grey: can't convert ipv6 addr to str %i", errno);
+      log_warnx("filter-spam: grey: can't convert ipv6 addr to str %i", errno);
       free(buf);
       return NULL;
     }
@@ -150,15 +150,15 @@ helper_ip2str(const struct sockaddr_storage *ss)
 
     if (hinet4_str(ip4, buf) == NULL)
     {
-      log_warn("filter-spam: grey: can't convert ipv4 addr to str %i", errno);
+      log_warnx("filter-spam: grey: can't convert ipv4 addr to str %i", errno);
       free(buf);
       return NULL;
     }
   }
   else
   {
-    log_warn("filter-spam: spf_session_set_conn: unknown protocol family %i",
-             ss->ss_family);
+    log_warnx("filter-spam: spf_session_set_conn: unknown protocol family %i",
+              ss->ss_family);
     free(buf);
     return NULL;
   }

@@ -36,7 +36,7 @@ spam_step_pause(uint64_t id, struct filter_connect *conn)
 
   if ((r = sleep(pause_seconds)) != 0)
   {
-    log_warn("filter-pause: wakeup %u seconds too early", r);
+    log_warnx("filter-pause: wakeup %u seconds too early", r);
     return SPAM_BAD;
   }
 

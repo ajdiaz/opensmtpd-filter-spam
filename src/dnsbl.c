@@ -72,7 +72,7 @@ spam_step_dnsbl(uint64_t id, struct filter_connect *conn)
 
   if (ret != EAI_NONAME)
   {
-    log_warn("filter-spam: dnsbl: trap spam: %s", buf);
+    log_warnx("filter-spam: dnsbl: trap spam: %s", buf);
     return SPAM_BAD;
   }
 

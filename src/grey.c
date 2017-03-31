@@ -26,8 +26,6 @@
 
 #include "grey.h"
 
-#define abort(l, m) do { log_warn(m); chain = SPAM_GOOD; goto l; } while(0)
-
 static time_t fast_reconnect_min = 60;
 static time_t expire_max = 24*3600;
 
@@ -73,14 +71,14 @@ spam_step_grey_mail(uint64_t id, struct mailaddr *addr)
 
   if ((ret = db_create(&dbp, NULL, 0)) != 0)
   {
-    log_warn("filter-spam: grey: unable to create DB object");
+    log_warnx("filter-spam: grey: unable to create DB object");
     return chain;
   }
 
 	if ((ret = dbp->open(dbp, NULL, greylist_db, NULL, DB_BTREE,
 	                     DB_CREATE, 0664)) != 0)
 	{
-	  log_warn("filter-spam: grey: unable to open greylist DB: %s",
+	  log_warnx("filter-spam: grey: unable to open greylist DB: %s",
 		      greylist_db);
 		return chain;
   }
@@ -106,13 +104,13 @@ spam_step_grey_mail(uint64_t id, struct mailaddr *addr)
     if (diff < fast_reconnect_min)
     {
       chain = SPAM_NEUTRAL;
-      log_warn("filter-spam: grey: greylisting %s: too fast retry (%lus)",
+      log_warnx("filter-spam: grey: greylisting %s: too fast retry (%lus)",
                buf, diff);
     }
     else if (diff > expire_max)
     {
       chain = SPAM_NEUTRAL;
-      log_warn("filter-spam: grey: greylisting %s: visit long time ago (%lus)",
+      log_warnx("filter-spam: grey: greylisting %s: visit long time ago (%lus)",
                buf, diff);
     }
     else
@@ -127,7 +125,7 @@ spam_step_grey_mail(uint64_t id, struct mailaddr *addr)
   data.size = sizeof(time_t);
 
   if (dbp->put(dbp, NULL, &key, &data, 0) != 0)
-    log_warn("filter-spam: grey: unable to save time into greylist DB");
+    log_warnx("filter-spam: grey: unable to save time into greylist DB");
 
   (void) dbp->close(dbp, 0);
   return chain;

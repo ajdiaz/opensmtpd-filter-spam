@@ -104,19 +104,20 @@ spam_step_spf_mail(uint64_t id, struct mailaddr *mail)
       ret = SPAM_GOOD;
       break;
     case SPF_RESULT_FAIL:
-      log_warn("filter-spam: spf: failed SPF validation %s via %s",
-               filter_api_mailaddr_to_text(mail),
-               d->addr);
+      log_warnx("filter-spam: spf: failed SPF validation %s via %s",
+                filter_api_mailaddr_to_text(mail),
+                d->addr);
       ret = SPAM_BAD;
+      break;
     default:
-      log_warn("filter-spam: spf: neutral SPF validation %s via %s",
-               filter_api_mailaddr_to_text(mail),
-               d->addr);
+      log_warnx("filter-spam: spf: neutral SPF validation %s via %s",
+                filter_api_mailaddr_to_text(mail),
+                d->addr);
       ret = SPAM_NEUTRAL;
   }
 
 clean:
-  if (err) log_warn("%s", err);
+  if (err) log_warnx("%s", err);
   if (spf_server) free(spf_server);
   if (spf_request) free(spf_request);
   return ret;
