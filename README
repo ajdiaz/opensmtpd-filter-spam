@@ -1,7 +1,15 @@
 OpenSMTPD spam trap support
 ===========================
 
-**Still under active development**
+!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! DEPRECATE WARNING !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Due to changes made in opensmtpd since version 6.0.3, filter are not
+available any more, in favor of new filter daemon (not yet productive).
+I will adapt these filter to the new daemon as soon as the daemon become
+ready, in the meanwhile, if you want to still using this filter just
+downgrade to version 6.0.2.
 
 
 This extra filter allow you to create a spam tram in OpenSMTPD, using DNSBL,
